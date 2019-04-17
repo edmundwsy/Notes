@@ -1,5 +1,9 @@
 # Successor Features
 
+[TOC]
+
+
+
 #### **Deep Reinforcement Learning with Successor Features for Navigation across Similar Environments**
 
 - Only rely on its onboard      sensors to perform the navigation task without explicit localization,      mapping and path planning procedures
@@ -104,7 +108,72 @@
 - 目前尚不清楚如何以保持原任务policy完整的方式转让上述知识
   
 
-尝试：
+### 之前的迁移尝试：
 
-1. > One attempt at **clearly separating reward** attribution for different tasks while learning a shared representation is the idea of learning a general (or universal) value function [14] over many (sub)-tasks that has recently also been combined with DQN-type methods
+#### 学习一个通用普适的value function
+
+> One attempt at **clearly separating reward** attribution for different tasks while learning a shared representation is the idea of **learning a general (or universal) value function** [14] over many (sub)-tasks that has recently also been combined with DQN-type methods [15].
+>
+> 
+>
+> [14] R. S. Sutton, J. Modayil, M. Delp, T. Degris, P. M. Pilarski, A. White, and D. Precup, “Horde: a scalable real-time architecture for learning knowledge from unsupervised sensorimotor interaction.” in The 10th International Conference on Autonomous Agents and Multiagent Systems-Volume, 2011.
+> [15] T. Schaul, D. Horgan, K. Gregor, and D. Silver, “Universal value function approximators,” in Proc. of the 32nd International Conference on Machine Learning (ICML), 2015.
+
+作者的方法可以被解释成普适value function 的一个特殊形式
+
+#### 微调DQN
+
+> E.g., Parisotto et al. [19] and Rusu et al. [20] performed multitask learning (transferring useful features between different ATARI games) by fine-tuning a DQN network (trained on a single ATARI game) on multiple “related” games.
+>
+> [19] E. Parisotto, L. J. Ba, and R. Salakhutdinov, “Actor-mimic: Deep multitask and transfer reinforcement learning,” in Proc. of the International Conference on Learning Representations (ICLR), 2016.
+> [20] A. A. Rusu, S. G. Colmenarejo, C. Gulcehre, G. Desjardins, J. Kirkpatrick, R. Pascanu, V. Mnih, K. Kavukcuoglu, and R. Hadsell, “Policy distillation,” in Proc. of the International Conference on Learning Representations (ICLR), 2016.
+
+#### Progressive Network
+
+> More directly related to our work, Rusu et al. [21] developed the Progressive Networks approach which trains an RL agent to progressively solve a set of tasks, allowing it to re-use the feature representation learned on tasks it has already mastered.
+>
+> Their derivation has the advantage that **performance on all considered tasks is preserved** but requires an ever growing set of learned representations.
+>
+> [21] A. A. Rusu, N. C. Rabinowitz, G. Desjardins, H. Soyer, J. Kirkpatrick, K. Kavukcuoglu, R. Pascanu, and R. Hadsell, “Progressive neural networks,” arXiv preprint arXiv:1606.04671, 2016.
+
+#### Successor representation
+
+使Q-Learning 可以被分成两个子任务：
+
+- 学习可靠的能预测奖励的特征
+- 估计特征随时间的演变
+
+之前的文献中已经说明在reward改变尺度和含义时，如何加速学习了
+
+本文还包含训练一个 deep auto-encoder
+
+
+
+
+
+## Background
+
+### RL
+
+写两个方程：
+
+agent 的目标是最大化未来累计预期回报(cumulative expected future reward(with discount factor $\gamma$))
+
+
+$$
+Q(\mathbf{s}, \mathbf{a} ; \pi)=\mathbb{E}\left[\sum_{t=0}^{\infty} \gamma^{t} R\left(\mathbf{s}_{t}\right) | \mathbf{s}_{0}=\mathbf{s}, \mathbf{a}_{0}=\mathbf{a}, \pi\right]
+$$
+因此用期望代替了policy dynamics（这就是value-based的原因？）
+
+在每个transition处，可以使用Bellman equation 去计算Q
+
+使用bellman equation 去选择最优子结构
+$$
+Q\left(\mathbf{s}_{t}, \mathbf{a}_{t} ; \pi\right)=R\left(\mathbf{s}_{t}\right)+\gamma \mathbb{E}\left[Q\left(\mathbf{s}_{t+1}, \mathbf{a}_{t+1} ; \pi\right)\right]
+$$
+
+
+### SF-RL
+
+
 
