@@ -25,3 +25,13 @@ for _ in range(1000):
 |             |      |      |
 | Pendulum-v0 |      |      |
 
+
+
+## Notes
+
+1. `env.reset()` will return a vector of observation. 
+
+2. `env.step() `need a parameter of action, sometimes could be an int or a vector; at the same      time, it would return the observation.
+
+3. `env.render() `is used little in the training, for most of the time there is no need to show the picture.
+
