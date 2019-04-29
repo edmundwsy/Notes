@@ -172,8 +172,148 @@ $$
 Q\left(\mathbf{s}_{t}, \mathbf{a}_{t} ; \pi\right)=R\left(\mathbf{s}_{t}\right)+\gamma \mathbb{E}\left[Q\left(\mathbf{s}_{t+1}, \mathbf{a}_{t+1} ; \pi\right)\right]
 $$
 
-
 ### SF-RL
 
+由于直接学Q-value 导致了黑盒近似使得模型之间的知识迁移更加困难
+
+**假定 reward function 可以被近似表征为 learned features $\phi (s;\theta_\phi )$ 的线性组合**  
+$$
+R(s) = \phi (s;\theta_\phi )^T\cdot  \omega
+$$
+其中 $\omega$ 是权重，$\phi (s;\theta_\phi )$  是learned features 
+$$
+Q(\mathbf{s}, \mathbf{a} ; \pi)\approx \mathbb{E}\left[\sum_{t=0}^{\infty} \gamma^{t} \phi(\mathbf s_t; \theta_\phi)  \cdot \omega~ | \mathbf{s}_{0}=\mathbf{s}, \mathbf{a}_{0}=\mathbf{a}, \pi\right] \\
+
+=\mathbb{E}\left[\sum_{t=0}^{\infty} \gamma^{t} \phi(\mathbf s_t; \theta_\phi) | \mathbf{s}_{0}=\mathbf{s}, \mathbf{a}_{0}=\mathbf{a}, \pi\right]\cdot \omega \\
+
+= \psi^\pi (\mathbf s, \mathbf a)^T  \cdot \omega
+$$
+
+**def:** successor features
+$$
+\psi^\pi (\mathbf s, \mathbf a) = \mathbb{E}\left[\sum_{t=0}^{\infty} \gamma^{t} \phi(\mathbf s_t; \theta_\phi) | \mathbf{s}_{0}=\mathbf{s}, \mathbf{a}_{0}=\mathbf{a}, \pi\right]
+$$
+  $\phi(\mathbf s_t; \theta_\phi) $ 由于$\theta_\phi$ 是参数，因此只与$\mathbf s_t$ 有关，可以简写成$\phi_{\mathbf{s_t}}$ ，也可以把$\psi^\pi (\mathbf s, \mathbf a)$ 写成 $\psi^\pi (\phi_{\mathbf{s}_{t}}, \mathbf{a}_{t})$
+
+由于只提出了 $\omega​$ （常量），因此可以写出类似Bellman equation的式子：
+$$
+\psi ^ \pi\left(\mathbf{s}_{t}, \mathbf{a}_{t}\right)=\phi_{\mathbf{s}_{t}} + \gamma \mathbb{E}\left[\psi^\pi (\phi_{\mathbf{s}_{t+1}}, \mathbf{a}_{t+1} )\right]
+$$
+由于推出这个式子，之后就可以使用Q-Learning训练
+
+#### 这样做的意义：
+
+> Effectively, this re-formulation separates the learning of the Q-function into two problems: 
+>
+> 1) estimating the expectation of descriptive features under the current policy dynamics 
+>
+> 2) estimating the reward obtainable in a given state.
+
+#### 解释为什么work
+
+可以同时学 $\theta_\phi ​$ **[CNNs]**, $\omega​$ , 以及 features mapping  $\psi^\pi (\phi_{\mathbf{s}}, \mathbf{a}; \theta_\psi )​$  **[FC]**
+
+损失函数为：
+$$
+L\left(\theta_{\psi}\right)=\underset{(s,a,s') \in \mathcal{D}_{T}} {\mathbb{E}}\left[\left(\phi_{\mathbf{s}}+\gamma \psi\left(\phi_{\mathbf{s}^{\prime}}, \mathbf{a}^{*} ; \theta_{\psi}^{-}\right)-\psi\left(\phi_{\mathbf{s}}, \mathbf{a} ; \theta_{\psi}\right)\right)^{2}\right] \\
+L\left(\theta_{\phi}, \theta_{d}, \omega\right) = \underset{(s, R(s)) \in \mathcal{D}_{R}}{\mathbb{E}}\left[\left(R(\mathbf{s})-\phi_{\mathbf{s}}^{T} \omega\right)^{2}+\left(\mathbf{s}-d\left(\phi_{\mathbf{s}} ; \theta_{d}\right)\right)^{2}\right]
+$$
+
+#### 如何学？？
+
+其中$\mathcal D_T​$和$\mathcal D_R​$分别表示收集的过渡和奖励经验数据
+
+$a * =argmax_{a'}Q(s',a',pi^*)​$ 通过插入近似后继特征计算$\psi\left(\phi_{\mathbf{s}^{\prime}}, \mathbf{a}^{*} ; \theta_{\psi}^{-}\right)​$
+
+$\theta_{\psi}^{-} $表示现在目标的successor feature的参数的近似
+
+为了提供稳定的学习，这些偶尔会从θψ中复制出来
+
+每5000个训练步骤替换目标后继功能参数。
+
+第一个损失函数对应于从online Q-Learning 学 successor features
+
+第二个损失函数对应于学$\theta_\phi ​$和$\omega​$
+
+### Architecture
+
+![1556542691732](assets/1556542691732.png)
+
+左上： $\textbf{s}_t​$  -->  (CNN-3layers)  -->  $\phi_{\mathbf{s}}​$
+
+右上： 将$\phi_{\mathbf{s}}^{k}​$ 映射回$\phi_{\mathbf{s}}^{1}​$ 的功能
+
+左下： 反卷积，将$\phi_{\mathbf{s}}^{k}$反推回$\hat {\textbf{s}}_{t}$
+
+右下： 两个FC层，学
 
 
+
+
+
+
+
+## 迁移学习
+
+由于先学出来features 因此天然就可以transfer
+
+考虑K RL problem （ a sequence which have shared  structure）
+
+两个不同的scenarios
+
+> The first, and simplest, notion of knowledge transfer occurs if all K tasks use **the same environment and transition dynamics** and **differ only in the reward function R**. In a navigation task this would be equivalent to finding paths to K different goal positions in one single maze.
+>
+> The second, and more general, notion of knowledge transfer occurs if **all K tasks use different environments** (and potentially different reward functions) which share some similarities within their state space. In a navigation task this includes <u>changing the maze structure or robot dynamics</u> between different tasks.
+
+#### 为什么第一种能transfer
+
+因为只有reward function不同
+
+学好了feature之后，task可以视作几个feature的线性组合，只需要对不同的模型应用不同的奖励$\omega ^k$，就可以改变reward function （这里不太清楚因为reward function不一定能视作线性？ 看假设条件！）
+
+#### 为什么第二种可以transfer？
+
+先推导action-value function
+$$
+Q(\mathbf{s}, \mathbf{a} ; \pi^k)=\mathbb{E}\left[\sum_{t=0}^{\infty} \gamma^{t} \phi_{{\mathbf s}_t} ^k| \mathbf{s}_{0}=\mathbf{s}, \mathbf{a}_{0}=\mathbf{a}, \pi^k \right] \cdot \omega^k
+$$
+假定task feature之间线性相关，即
+$$
+\phi_{\mathrm{s}}^{i}=\mathcal{B}^{i} \phi_{\mathrm{s}}^{k} ~~~(i \leq k)
+$$
+由于有非线性的神经网络，因此这个条件不是非常严格
+
+再次使用期望是线性算子的事实（说白了就是可以把一些东西提出来）
+$$
+\begin{aligned} Q^{i}\left(\mathbf{s}, \mathbf{a} ; \pi^{i}\right) & \approx \mathbb{E}\left[\sum_{t=0}^{\infty} \mathcal{B}^{i} \gamma^{t} \phi_{\mathbf{s}_{t}}^{k} | \mathbf{s}_{0}=\mathbf{s}, \mathbf{a}_{0}=\mathbf{a}, \pi^{i}\right] \cdot \omega^{i} \\ &=\mathcal{B}^{i} \mathbb{E}\left[\sum_{t=0}^{\infty} \gamma^{t} \phi_{\mathbf{s}_{t}}^{k} | \mathbf{s}_{0}=\mathbf{s}, \mathbf{a}_{0}=\mathbf{a}, \pi^{i}\right] \omega^{i} \\ &=\mathcal{B}^{i} \psi^{\pi^{i}}\left(\phi_{\mathbf{s}_{t}}^{k}, \mathbf{a}\right)^{T} \omega^{i} \\ &=\psi^{\pi^{i}}\left(\mathcal{B}^{i} \phi_{\mathbf{s}_{t}}^{k}, \mathbf{a}\right)^{T} \omega^{i} \end{aligned}
+$$
+一个直接的tranfer的办法
+
+1. 训练$\theta _{\phi^{k-1} }$和$\theta _{\psi^{k-1}}$ 的时候初始化$\theta _{\phi^k }$和$\theta _{\psi^k}$ ，通过SGD训练$\psi^{\pi^{k}} \text { and } \phi^{k}$
+
+2. 训练$\mathcal B ^i$，并保持$\phi_{\mathbf{s}}^{i} \approx \mathcal{B}^{i} \phi_{\mathbf{s}}^{k}$
+
+3. 对所有旧的task训练，才能得到successor feature
+
+   >To obtain successor features for the previous tasks, estimate the expectation of the features for the current task k under the old task policies to obtain $\psi^{\pi^{i}}\left(\phi_{\mathrm{s}}^{k}, \mathbf{a}\right)$ so that Eq. (7) can be computed during evaluation. Note that this means we have to estimate the expectation of the current task features **under all old task dynamics and policies**. Since we expect significant overlap between tasks in our experiments this can be implemented memory efficiently by using **one single neural network with multiple output layers** to implement all task specific successor features. Alternatively, if the successor feature networks are small, one can just preserve the old task successor feature networks and use Eq. (8) for selecting actions for old tasks.
+
+$$
+{L^{k}\left(\left\{\theta_{\psi^{1}}, \ldots, \theta_{\psi^{k}}\right\}\right)=} \\ {\sum_{i \leq k} \underset{\left(s, a, s^{\prime}\right)}{\mathbb{E}}\left[\left(\phi_{\mathbf{s}}^{k}+\gamma \psi^{i}\left(\phi_{\mathbf{s}^{\prime}}^{k} \mathbf{a}^{i *} ; \theta_{\psi^{i}}^{-}\right)-\psi^{i}\left(\phi_{\mathbf{s}}^{k}, \mathbf{a} ; \theta_{\psi^{i}}\right)\right)^{2}\right]} \\
+$$
+
+$$
+L^{k}\left(\theta_{\phi}, \theta_{d}, \omega^{k},\left\{\mathcal{B}^{1}, \ldots, \mathcal{B}^{k-1}\right\}\right)\\
+=\underset{(s, R(s)) \in \mathcal{D}_{R}^{k}}{\mathbb{E}}\left[\left(R(\mathbf{s})-\phi_{\mathbf{s}}^{k T} \omega^{k}\right)^{2}+\left(\mathbf{s}-d\left(\phi_{\mathbf{s}}^{k} ; \theta_{d^{k}}\right)\right)^{2}\right]\\
++\sum_{i<k} \underset{(s, R(s)) \in \mathcal{D}_{R}^{i}}{\mathbb{E}}\left[\left(\phi_{s}^{i}-\mathcal{B}^{i} \phi_{s}^{k}\right)^{2}\right]
+$$
+
+
+
+好处：
+
+- 后继特征网络小，则存储开销小
+- 可以共享网络
+
+#### WHY it works?
+
+由于共享结构，早期层过滤器可以很大规模上被重用，剩余的可以通过线性映射捕获，因此可以快速学习
